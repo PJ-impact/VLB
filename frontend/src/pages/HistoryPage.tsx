@@ -9,7 +9,9 @@ import {
   Clock, 
   Briefcase, 
   Download,
-  Calendar
+  Calendar,
+  Filter,
+  X
 } from 'lucide-react';
 
 interface VisitorHistoryItem {
@@ -26,7 +28,12 @@ interface VisitorHistoryItem {
 export const HistoryPage: React.FC = () => {
   const [history, setHistory] = useState<VisitorHistoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Filter States
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [classificationFilter, setClassificationFilter] = useState<'all' | 'individual' | 'company'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'present' | 'checked-out'>('all');
+  const [dateFilter, setDateFilter] = useState<string>('');
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -71,15 +78,46 @@ export const HistoryPage: React.FC = () => {
     return `${hours}h ${mins}m`;
   };
 
+  const clearFilters = () => {
+    setSearchQuery('');
+    setClassificationFilter('all');
+    setStatusFilter('all');
+    setDateFilter('');
+  };
+
+  const hasActiveFilters = Boolean(
+    searchQuery || classificationFilter !== 'all' || statusFilter !== 'all' || dateFilter
+  );
+
   const filteredHistory = history.filter((v) => {
     const q = searchQuery.toLowerCase();
     const { hostPerson, department } = parseHostDetails(v.host);
-    return (
+
+    // 1. Text Query Matching
+    const matchesQuery =
       v.name.toLowerCase().includes(q) ||
       v.affiliation.toLowerCase().includes(q) ||
       hostPerson.toLowerCase().includes(q) ||
-      department.toLowerCase().includes(q)
-    );
+      department.toLowerCase().includes(q);
+
+    // 2. Classification Filter
+    const matchesClassification =
+      classificationFilter === 'all' ||
+      (classificationFilter === 'company' && v.isCompany) ||
+      (classificationFilter === 'individual' && !v.isCompany);
+
+    // 3. Status Filter (Checked Out vs Still Present)
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'present' && !v.checkOutTime) ||
+      (statusFilter === 'checked-out' && Boolean(v.checkOutTime));
+
+    // 4. Date Filter (Check-in date YYYY-MM-DD match)
+    const matchesDate =
+      !dateFilter ||
+      (v.checkInTime && new Date(v.checkInTime).toISOString().slice(0, 10) === dateFilter);
+
+    return matchesQuery && matchesClassification && matchesStatus && matchesDate;
   });
 
   const exportToCSV = () => {
@@ -137,7 +175,7 @@ export const HistoryPage: React.FC = () => {
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
-              Export CSV
+              Export Filtered CSV ({filteredHistory.length})
             </button>
             <button
               type="button"
@@ -151,16 +189,69 @@ export const HistoryPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="mb-6 relative max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by visitor, host, department, or affiliation..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-300 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
-          />
+        {/* Multi-Parameter Filter Toolbar */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col lg:flex-row items-center gap-3">
+          {/* 1. Main Search Query */}
+          <div className="relative flex-1 w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by visitor, host, department, or affiliation..."
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-300 text-sm bg-slate-50/50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
+            />
+          </div>
+
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full lg:w-auto">
+            {/* 2. Classification Dropdown */}
+            <div className="w-full sm:w-auto">
+              <select
+                value={classificationFilter}
+                onChange={(e) => setClassificationFilter(e.target.value as any)}
+                className="w-full sm:w-auto px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                <option value="all">All Classifications</option>
+                <option value="individual">Individual</option>
+                <option value="company">Company</option>
+              </select>
+            </div>
+
+            {/* 3. Status Dropdown */}
+            <div className="w-full sm:w-auto">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="w-full sm:w-auto px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                <option value="all">All Statuses</option>
+                <option value="present">Still Present</option>
+                <option value="checked-out">Checked Out</option>
+              </select>
+            </div>
+
+            {/* 4. Date Picker Filter */}
+            <div className="w-full sm:w-auto">
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full sm:w-auto px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+
+            {/* 5. Clear Filters Button */}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition"
+              >
+                <X className="w-3.5 h-3.5" />
+                Reset
+              </button>
+            )}
+          </div>
         </div>
 
         {/* History Table */}
@@ -171,8 +262,8 @@ export const HistoryPage: React.FC = () => {
             </div>
           ) : filteredHistory.length === 0 ? (
             <div className="py-16 text-center text-slate-400 text-sm">
-              {searchQuery
-                ? 'No logs matched your query.'
+              {hasActiveFilters
+                ? 'No visitor records match the active filter criteria.'
                 : 'No historical visitor records found.'}
             </div>
           ) : (
@@ -248,7 +339,7 @@ export const HistoryPage: React.FC = () => {
                               </div>
                               <div className="flex items-center gap-1 text-slate-400 mt-0.5">
                                 <Clock className="w-3 h-3" />
-                               {new Date(item.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(item.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </div>
                             </>
                           ) : (
