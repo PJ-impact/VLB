@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3003/v1';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -20,7 +20,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthAttempt = error.config?.url?.startsWith('/auth/');
+    if (error.response?.status === 401 && !isAuthAttempt) {
       localStorage.removeItem('vlb_token');
       localStorage.removeItem('vlb_user');
       window.location.href = '/login';

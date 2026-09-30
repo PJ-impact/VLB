@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import { NavBar } from '../components/NavBar';
+import { NavBar } from '../components/Navbar';
 import { 
   Building2, 
   User, 
@@ -10,8 +10,7 @@ import {
   Briefcase, 
   Download,
   Calendar,
-  Filter,
-  X
+  X,
 } from 'lucide-react';
 
 interface VisitorHistoryItem {
