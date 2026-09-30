@@ -6,6 +6,7 @@ import { DRIZZLE } from '../database/database.module.js';
 import { users } from '../database/schema.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { recordAttempt } from './login-diagnostics.js';
 
 @Injectable()
 export class AuthService {
@@ -51,6 +52,8 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    recordAttempt('received', dto);
+
     // 1. Find user by email
     const [user] = await this.db
       .select()
@@ -58,12 +61,14 @@ export class AuthService {
       .where(eq(users.email, dto.email));
 
     if (!user) {
+      recordAttempt('no-user-found', dto);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // 2. Compare plain password with stored hash
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
     if (!isPasswordValid) {
+      recordAttempt('password-mismatch', dto);
       throw new UnauthorizedException('Invalid credentials');
     }
 

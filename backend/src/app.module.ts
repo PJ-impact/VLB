@@ -12,12 +12,16 @@ import { VisitorsModule } from './visitors/visitors.module.js';
     DatabaseModule,
     AuthModule,
     VisitorsModule, 
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 10,
-      },
-    ]),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 60000,
+          limit: 30,
+        },
+      ],
+      errorMessage: (_context, detail) =>
+        `Too many requests. Please wait ${detail.timeToBlockExpire}s and try again.`,
+    }),
   ],
   controllers: [AppController],
   providers: [
